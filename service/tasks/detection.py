@@ -25,10 +25,14 @@ def markers_payload(markers):
     }
 
 
-def run_service(detector, cap, ws, H, preprocess=False):
+def run_service(detector, cap, ws, H, preprocess=False, grace_frames=3):
     try:
         WINDOW_NAME = "MAIN"
         cv.namedWindow(WINDOW_NAME, cv.WINDOW_AUTOSIZE)
+
+        # Stable state - temporal smoothing to avoid jitter
+        active_markers = {}   # id -> Marker
+        miss_counts = {}      # id -> int
 
         while True:
             ret, frame = cap.read()
@@ -39,24 +43,48 @@ def run_service(detector, cap, ws, H, preprocess=False):
 
             # Undistortion
             frame = cv.remap(
-                        frame,
-                        MAP_A,
-                        MAP_B,
-                        interpolation=cv.INTER_LINEAR
-                    )
-            
+                frame,
+                MAP_A,
+                MAP_B,
+                interpolation=cv.INTER_LINEAR
+            )
+
             detection_frame = preprocess_img(frame) if preprocess else frame
 
-            markers = []  # always send payload 
+            # ---- Detection ----
+            detected_markers = {}  # id -> Marker (this frame only)
+
             corners, ids = detector.detect(detection_frame)
             if corners is not None and ids is not None:
                 corners_tf = [cv.perspectiveTransform(c, H) for c in corners]
                 markers = Marker.from_cv_collection(ids, corners_tf)
+
+                for m in markers:
+                    detected_markers[m.id] = m
+
                 frame = cv.aruco.drawDetectedMarkers(frame, corners, ids)
 
-            cv.imshow(WINDOW_NAME, cv.resize(frame, None, fx=0.3, fy=0.3))
+            # ---- Update stable state ----
 
-            ws.broadcast(markers_payload(markers))
+            # 1. Handle detected markers (reset miss counter / add new)
+            for marker_id, marker in detected_markers.items():
+                active_markers[marker_id] = marker
+                miss_counts[marker_id] = 0
+
+            # 2. Handle missing markers
+            for marker_id in list(active_markers.keys()):
+                if marker_id not in detected_markers:
+                    miss_counts[marker_id] = miss_counts.get(marker_id, 0) + 1
+
+                    if miss_counts[marker_id] >= grace_frames:
+                        del active_markers[marker_id]
+                        del miss_counts[marker_id]
+
+            # ---- Broadcast ONLY stable markers ----
+            ws.broadcast(markers_payload(list(active_markers.values())))
+
+            # ---- Debug view ----
+            cv.imshow(WINDOW_NAME, cv.resize(frame, None, fx=0.5, fy=0.5))
 
             if cv.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -105,5 +133,5 @@ if __name__ == "__main__":
     ws = WebSocketServer(port=5001)
     ws.start()
     
-    run_service(detector, cap, ws, H, True)
+    run_service(detector, cap, ws, H, True, grace_frames=3)
     
