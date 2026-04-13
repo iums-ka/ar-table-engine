@@ -38,10 +38,10 @@ async def run(test_img):
             print("Connection closed")
 
 if __name__ == "__main__":
-    CFG = load_config(r"service/config.json")
-    test_img = cv.imread(r"C:\Users\ExploraVision\Src\ar_table_backend_service\text-test-4k.png")
-    cam_to_proj_H = np.load(r"C:\Users\ExploraVision\Src\ar_table_backend_service\service\calibration\cam_to_proj_H.npy")
-    bounding_box_H = np.load(r"C:\Users\ExploraVision\Src\ar_table_backend_service\service\calibration\bounding_box_H.npy")
+    CFG = load_config(r"./data/config.json")
+    test_img = cv.imread(r"./data/text-test-4k.png")
+    cam_to_proj_H = np.load(r"./data/calibration/cam_to_proj_H.npy")
+    bounding_box_H = np.load(r"./data/calibration/bounding_box_H.npy")
     WNAME = "Test-Client"
     WINDOW = cv.namedWindow(WNAME, cv.WINDOW_NORMAL)
     cv.moveWindow(WNAME, 

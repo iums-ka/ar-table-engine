@@ -4,17 +4,29 @@ Backend service for camera calibration and ArUco marker detection, designed to s
 
 
 ## Project Structure (Relevant Parts Only)
-
+See [src layout](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/) for further details.
 ```
 
-service/
-├── calibration/        # Calibration outputs (camera + homographies)
-├── tasks/
-│   ├── calibration.py  # Camera & homography calibration
-│   └── detection.py    # Marker detection + websocket broadcasting
-├── vision/             # Vision / detection logic
-├── ws/                 # WebSocket server
-└── utils/
+ar-table-backend-service/
+├── pyproject.toml
+├── README.md
+├── .gitignore
+├── sitecustomize.py
+│
+├── data/
+│   ├── config.json
+│   └── calibration/                 # Intrinsics and homography
+│
+├── src/
+│   └── service/
+│       ├── __init__.py
+│       ├── tasks/                   # Calibration, detection, websocket broadcast          
+│       ├── utils/
+│       ├── vision/                  # ArUco and more
+│       └── ws/
+│
+└── tests/
+    └── ...
 
 ```
 
@@ -35,7 +47,7 @@ From the project root:
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
-pip install -e .
+pip install -e ".[dev]"  # includes pytest and such 
 ```
 
 ---

@@ -73,12 +73,12 @@ def run_service(detector, marker_tracker, cap, ws, H, preprocess=False):
 
 
 if __name__ == "__main__":
-    CFG = load_config(r"service/config.json")
+    CFG = load_config(r"./data/config.json")
     # Load calibration
-    ud = np.load(os.path.join('service/calibration', 'undistortion_args.npz'))
-    camMtx = ud["camMtx"]
-    distCoeffs = ud["distCoeff"]
-    camMtxNew = ud["camMtxNew"]
+    intrinsics = np.load(os.path.join('./data/calibration', 'undistortion_args.npz'))
+    camMtx = intrinsics["camMtx"]
+    distCoeffs = intrinsics["distCoeff"]
+    camMtxNew = intrinsics["camMtxNew"]
     
     # TODO: add to camera class
     MAP_A, MAP_B = dist_to_map(camMtx,
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     grace_frames = 5
     marker_tracker = MarkerTracker(grace_frames) 
 
-    CALIBRATION_DIR = 'service/calibration'
+    CALIBRATION_DIR = r"./data/calibration"
     BOUNDING_BOX_H = np.load(os.path.join(CALIBRATION_DIR, 'bounding_box_H.npy'))
     CAM_TO_PROJ_H = np.load(os.path.join(CALIBRATION_DIR, 'cam_to_proj_H.npy'))
 

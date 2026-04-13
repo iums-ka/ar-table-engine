@@ -8,8 +8,12 @@ dependencies = [
     "websockets",
 ]
 
-[tool.setuptools]
-packages = ["service"]
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
 
-[tool.setuptools.package-dir]
-"" = "."
+[tool.pytest]
+minversion = "9.0"
+addopts = ["-ra", "--import-mode=importlib"]
+testpaths = ["tests"]

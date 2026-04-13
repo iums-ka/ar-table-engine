@@ -299,13 +299,13 @@ def _get_most_recent_frame():
 
 if __name__ == "__main__":
     DEBUG = True
-    CFG = load_config(r"service/config.json")
+    CFG = load_config(r"./data/config.json")
 
-    # Load calibration
-    ud = np.load(os.path.join('service/calibration', 'undistortion_args.npz'))
-    camMtx = ud["camMtx"]
-    distCoeffs = ud["distCoeff"]
-    camMtxNew = ud["camMtxNew"]
+    # Load intrinsics
+    intrinsics = np.load(os.path.join('./data/calibration', 'undistortion_args.npz'))
+    camMtx = intrinsics["camMtx"]
+    distCoeffs = intrinsics["distCoeff"]
+    camMtxNew = intrinsics["camMtxNew"]
     
     # TODO: add to camera class
     MAP_A, MAP_B = dist_to_map(camMtx,
@@ -342,7 +342,7 @@ if __name__ == "__main__":
     print("Calibration was successful.")
 
     # Save calibration
-    CALIBRATION_DIR = 'service/calibration'
+    CALIBRATION_DIR = r"./data/calibration"
     os.makedirs(CALIBRATION_DIR, exist_ok=True)
     np.save(os.path.join(CALIBRATION_DIR, 'cam_to_proj_H.npy'), camera_to_projector_H)
     np.save(os.path.join(CALIBRATION_DIR, 'bounding_box_H.npy'), bounding_box_H)
