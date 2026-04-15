@@ -47,6 +47,7 @@ class Marker:
 
     @staticmethod
     def _test_marker_class():  # TEMPORARY - add testing package at some point
+
         # --- Simulated OpenCV output ---
         corners = (
             np.array([[[0, 0], [1, 0], [1, 1], [0, 1]]], dtype=np.float32),
@@ -98,49 +99,6 @@ class Marker:
         frame = cv.aruco.drawDetectedMarkers(frame, corners_cv, ids_cv)
 
         assert frame is not None
-
-
-class TrackedMarker:
-    def __init__(self, marker: Marker):
-        self.marker = marker
-        self.missed_frames = 0
-        # Further relevant states e.g. last_position for interpolation
-
-    def update_seen(self, marker: Marker):
-        self.marker = marker
-        self.missed_frames = 0
-
-    def update_unseen(self):
-        self.missed_frames += 1
-
-
-class MarkerTracker:
-    def __init__(self, grace_frames=0):
-        self.tracked_markers: dict[int, TrackedMarker] = {}
-        self.grace_frames = grace_frames
-    
-    def update(self, detected_markers: list[Marker]):
-            detected_map = {m.id: m for m in detected_markers}
-
-            # Update existing tracked markers
-            for tid, track in self.tracked_markers.items():
-                if tid in detected_map:
-                    track.update_seen(detected_map[tid])
-                else:
-                    track.update_unseen()
-
-            # Add new tracked markers
-            for mid, marker in detected_map.items():
-                if mid not in self.tracked_markers:
-                    self.tracked_markers[mid] = TrackedMarker(marker)
-
-            # Remove stale tracked markers
-            for tid in list(self.tracked_markers.keys()):
-                if self.tracked_markers[tid].missed_frames > self.grace_frames:
-                    del self.tracked_markers[tid]
-
-    def get_tracked_markers(self):
-        return [t.marker for t in self.tracked_markers.values()]
 
 
 class ArucoMarkerDetector:

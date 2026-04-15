@@ -2,7 +2,8 @@ import os
 from service.utils.transform_utils import dist_to_map
 from service.utils.file_utils import load_config
 from service.vision.camera import init_video_capture, preprocess_img
-from service.vision.aruco import ArucoMarkerDetector, Marker, MarkerTracker
+from service.vision.aruco.detection import Marker, ArucoMarkerDetector
+from service.vision.aruco.tracking import MarkerTracker
 from service.ws.server import WebSocketServer
 
 import cv2 as cv
@@ -99,7 +100,8 @@ if __name__ == "__main__":
 
 
     grace_frames = 5
-    marker_tracker = MarkerTracker(grace_frames) 
+    min_observations = 5
+    marker_tracker = MarkerTracker(grace_frames, min_observations) 
 
     CALIBRATION_DIR = r"./data/calibration"
     BOUNDING_BOX_H = np.load(os.path.join(CALIBRATION_DIR, 'bounding_box_H.npy'))

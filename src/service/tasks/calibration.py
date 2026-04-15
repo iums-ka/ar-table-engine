@@ -1,7 +1,7 @@
 from service.utils.file_utils import load_config
 from service.vision.camera import init_video_capture
 from service.utils.transform_utils import dist_to_map
-from service.vision.aruco import ArucoMarkerDetector
+from service.vision.aruco.detection import ArucoMarkerDetector
 import time
 import cv2 as cv
 import numpy as np

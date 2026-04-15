@@ -1,6 +1,6 @@
 import numpy as np
-from service.vision.aruco import Marker, MarkerTracker
-
+from service.vision.aruco.detection import Marker 
+from service.vision.aruco.tracking import MarkerTracker, TrackedMarkerState
 
 # ----------------------------
 # Helper: fake marker creator
@@ -21,13 +21,14 @@ def test_marker_survives_grace_period():
 
     m = make_marker(1)
 
-    tracker.update([m])  # seen
+    tracker.update([m])  # seen → STABLE (min_observations=1)
     tracker.update([])   # miss 1
     tracker.update([])   # miss 2
     tracker.update([])   # miss 3
 
-    # still alive (exactly at threshold behavior depends on your > or >= logic)
-    assert 1 in tracker.tracked_markers
+    # still alive because condition is ">"
+    assert 1 in tracker._tracked_markers
+    assert tracker._tracked_markers[1].state == TrackedMarkerState.STABLE
 
 
 # ----------------------------
@@ -41,9 +42,9 @@ def test_marker_removed_after_grace_exceeded():
     tracker.update([m])  # seen
     tracker.update([])   # miss 1
     tracker.update([])   # miss 2
-    tracker.update([])   # miss 3 → should be removed
+    tracker.update([])   # miss 3 → exceeds grace → STALE → culled
 
-    assert 1 not in tracker.tracked_markers
+    assert 1 not in tracker._tracked_markers
 
 
 # ----------------------------
@@ -60,4 +61,42 @@ def test_marker_reappears_resets_missed_frames():
 
     tracker.update([m])   # seen again → reset
 
-    assert tracker.tracked_markers[1].missed_frames == 0
+    assert tracker._tracked_markers[1].unobserved_frames == 0
+    assert tracker._tracked_markers[1].state == TrackedMarkerState.STABLE
+
+
+# ----------------------------
+# Test 4: requires multiple observations to stabilize
+# ----------------------------
+def test_marker_requires_min_observations():
+    tracker = MarkerTracker(min_observations=3)
+
+    m = make_marker(1)
+
+    tracker.update([m])  # 1 → INSTABLE
+    assert tracker._tracked_markers[1].state == TrackedMarkerState.INSTABLE
+
+    tracker.update([m])  # 2 → still INSTABLE
+    assert tracker._tracked_markers[1].state == TrackedMarkerState.INSTABLE
+
+    tracker.update([m])  # 3 → becomes STABLE
+    assert tracker._tracked_markers[1].state == TrackedMarkerState.STABLE
+
+
+# ----------------------------
+# Test 5: instability resets if missed
+# ----------------------------
+def test_instability_resets_on_miss():
+    tracker = MarkerTracker(min_observations=3)
+
+    m = make_marker(1)
+
+    tracker.update([m])  # 1
+    tracker.update([m])  # 2
+
+    tracker.update([])   # miss → observed resets
+
+    tracker.update([m])  # 1 again
+
+    assert tracker._tracked_markers[1].observed_frames == 1
+    assert tracker._tracked_markers[1].state == TrackedMarkerState.INSTABLE
