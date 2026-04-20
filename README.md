@@ -1,6 +1,27 @@
-# AR Table Backend Service
+# AR Table Engine
 
-Backend service for camera calibration and ArUco marker detection, designed to support an AR table / projector setup. The system provides camera undistortion, homography-based mapping, and real-time marker tracking over WebSockets.
+Core runtime service for an AR Table (camera-projector-system).
+
+This repository provides the spatial computing foundation required to operate the system, including camera-projector calibration and real-time ArUco marker tracking. It is responsible for transforming raw camera input into stable, calibrated world-space data that can be consumed by applications.
+
+## Responsibilities
+
+- Camera calibration (intrinsics, distortion correction)
+- Projector ↔ camera alignment (homography mapping)
+- Real-time ArUco marker detection and tracking
+- State stabilization and tracking lifecycle management
+- Streaming spatial data via WebSocket
+
+## Role in the System
+
+The engine acts as a standalone service that continuously processes sensor input and exposes the resulting spatial information over a network interface. It does **not** contain any application logic or user-facing features.
+
+Applications connect to this service to receive marker information (position, id, etc.) and enable user interactions with the physical table environment.
+
+## Related Repositories
+
+- **[ar-table-apps](https://github.com/iums-ka/ar-table-apps)**  
+  Collection of applications built on top of the engine. These apps consume the spatial data stream and implement user-facing experiences, interactions, and domain-specific logic.
 
 
 ## Project Structure (Relevant Parts Only)
