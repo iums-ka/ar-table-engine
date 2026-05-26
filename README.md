@@ -1,10 +1,10 @@
 # AR Table Engine
 
-Core runtime service for an AR Table (camera-projector-system).
-
-This repository provides the spatial computing foundation required to operate the system, including camera-projector calibration and real-time ArUco marker tracking. It is responsible for transforming raw camera input into stable, calibrated world-space data that can be consumed by applications.
+This project includes AR Table (camera-projector-system) calibration logic (encompassing calibration result persistence) and service logic to broadcast detection results to clients using a given calibration.
 
 ## Responsibilities
+
+### What the engine does
 
 - Camera calibration (intrinsics, distortion correction)
 - Projector ↔ camera alignment (homography mapping)
@@ -12,11 +12,8 @@ This repository provides the spatial computing foundation required to operate th
 - State stabilization and tracking lifecycle management
 - Streaming spatial data via WebSocket
 
-## Role in the System
-
-The engine acts as a standalone service that continuously processes sensor input and exposes the resulting spatial information over a network interface. It does **not** contain any application logic or user-facing features.
-
-Applications connect to this service to receive marker information (position, id, etc.) and enable user interactions with the physical table environment.
+### What the engine does not do
+It does not contain any application-specific logic or user-facing features. Instead, it exposes raw spatial information (e.g. position, rotation (WIP)) to downstream tasks such as frontend applications that further interpret these results to enable meaningful interactions.
 
 ## Related Repositories
 
@@ -28,7 +25,7 @@ Applications connect to this service to receive marker information (position, id
 See [src layout](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/) for further details.
 ```
 
-ar-table-backend-service/
+ar-table-engine/
 ├── pyproject.toml
 ├── README.md
 ├── .gitignore
@@ -39,7 +36,7 @@ ar-table-backend-service/
 │   └── calibration/                 # Intrinsics and homography
 │
 ├── src/
-│   └── service/
+│   └── ar_table_engine/
 │       ├── __init__.py
 │       ├── tasks/                   # Calibration, detection, websocket broadcast          
 │       ├── utils/
@@ -66,9 +63,7 @@ ar-table-backend-service/
 From the project root:
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e ".[dev]"  # includes pytest and such 
+uv sync --extra dev  # includes pytest and such 
 ```
 
 ---
@@ -170,7 +165,7 @@ Resolution of the primary monitor. Used for correct window placement.
 
 ## Calibration
 
-Before running detection, **calibration files must exist** in the `service/calibration` directory.
+Before running detection, **calibration files must exist** in the `ar_table_engine/calibration` directory.
 
 Required files:
 
@@ -185,7 +180,9 @@ The two homography files (two latter files above) can either be placed manually 
 From the project root:
 
 ```bash
-python -m service.tasks.calibration
+uv run python -m ar_table_engine.tasks.calibration
+# or with active venv, simply:
+python -m ar_table_engine.tasks.calibration
 ```
 
 > Note: The undistortion arguments file must be manually placed into the calibration directory, as it is not generated within this calibration.
@@ -199,7 +196,9 @@ Once all required calibration files are present, marker detection can be started
 From the project root:
 
 ```bash
-python -m service.tasks.detection
+uv run python -m ar_table_engine.tasks.detection
+# or with active venv, simply:
+python -m ar_table_engine.tasks.detection
 ```
 
 This starts a WebSocket server on:

@@ -27,23 +27,29 @@ class Marker:
             corners_cv.append(corners)
             ids_cv.append([m.id])
         return corners_cv, np.array(ids_cv, dtype=np.int32)
+
     @staticmethod
-    def from_cv_collection(ids, corners):  # Input: N-size Tuple of (1, 4, 2) - cv format
+    def from_cv_collection(
+        ids, corners
+    ):  # Input: N-size Tuple of (1, 4, 2) - cv format
         ids_cv = ids[:, np.newaxis, :]
         return [Marker(*m) for m in zip(ids_cv, corners)]
+
     def to_cv(self):  # Output: (corners, id) in cv format
         return self.corners_cv, np.array([[self.id]])
+
     def __init__(self, id, corners):
         self.id = int(np.squeeze(id))
         self.corners_cv = corners  # Save it to save on conversion. Is this worth it?
         self.process_corners()
+
     def process_corners(self):
         tmp = self.corners_cv.squeeze()
         self.center = Coordinate(*tmp.mean(axis=0))
         self.TL = Coordinate(tmp[0][0], tmp[0][1])
         self.TR = Coordinate(tmp[1][0], tmp[1][1])
         self.BR = Coordinate(tmp[2][0], tmp[2][1])
-        self.BL = Coordinate(tmp[3][0], tmp[3][1])        
+        self.BL = Coordinate(tmp[3][0], tmp[3][1])
 
     @staticmethod
     def _test_marker_class():  # TEMPORARY - add testing package at some point
@@ -103,9 +109,12 @@ class Marker:
 
 class ArucoMarkerDetector:
     """Class for detecting ArUco markers in images using specific parameters."""
+
     def __init__(self, aruco_dict: str, detector_params: dict = None) -> None:
-        self.aruco_dict = cv.aruco.getPredefinedDictionary(getattr(cv.aruco, aruco_dict))
-        
+        self.aruco_dict = cv.aruco.getPredefinedDictionary(
+            getattr(cv.aruco, aruco_dict)
+        )
+
         # setup marker detector
         if detector_params is None:
             self.detector = cv.aruco.ArucoDetector(self.aruco_dict)
@@ -113,7 +122,9 @@ class ArucoMarkerDetector:
             self.detector_params = cv.aruco.DetectorParameters()
             for key, value in detector_params.items():
                 setattr(self.detector_params, key, value)
-            self.detector = cv.aruco.ArucoDetector(self.aruco_dict, self.detector_params)
+            self.detector = cv.aruco.ArucoDetector(
+                self.aruco_dict, self.detector_params
+            )
 
     def detect(self, img: np.ndarray, debug: bool = False) -> tuple:
         """Detects ArUco markers in the given image and returns their corners and IDs."""
@@ -124,8 +135,12 @@ class ArucoMarkerDetector:
             debug_img = img.copy()
             if ids is not None:
                 debug_img = cv.aruco.drawDetectedMarkers(debug_img, corners, ids)
-            cv.imshow("Detected ArUco Markers", cv.resize(debug_img, (0, 0), fx=0.4, fy=0.4)) # TODO: adjust this to actual screen size
-            print("Displaying debug window. To continue, select the debug window and then press any key.")
+            cv.imshow(
+                "Detected ArUco Markers", cv.resize(debug_img, (0, 0), fx=0.4, fy=0.4)
+            )  # TODO: adjust this to actual screen size
+            print(
+                "Displaying debug window. To continue, select the debug window and then press any key."
+            )
             cv.waitKey(0)
-            cv.destroyWindow("Detected ArUco Markers")        
+            cv.destroyWindow("Detected ArUco Markers")
         return corners, ids

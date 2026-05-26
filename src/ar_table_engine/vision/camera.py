@@ -1,7 +1,8 @@
-from service.utils.platform_info import CURRENT_OS, OS
-from enum import Enum, auto
 import cv2 as cv
 import numpy as np
+
+from ar_table_engine.utils.platform_info import CURRENT_OS, OS
+
 
 def init_video_capture(cam_idx, width, height, fps):
     if CURRENT_OS is OS.LINUX:
@@ -33,9 +34,7 @@ def init_video_capture(cam_idx, width, height, fps):
 
 
 def preprocess_img(img: np.ndarray) -> np.ndarray:
-    """
-    Preprocess the captured image to improve marker detection for cases where markers are not being recognized reliably.
-    """
+    """Preprocess the captured image to improve marker detection for cases where markers are not being recognized reliably."""
     gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     clahe_img = clahe.apply(gray)
@@ -57,16 +56,16 @@ def preprocess_img(img: np.ndarray) -> np.ndarray:
     # return cleaned
 
 
-
 if __name__ == "__main__":
     cap = init_video_capture(0, 1920, 1080, 30)
     print(cap.get(cv.CAP_PROP_FRAME_WIDTH))
     print(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
     print(cap.get(cv.CAP_PROP_FPS))
     print(cap.get(cv.CAP_PROP_BUFFERSIZE))
-    
+
     # For testing camera frame buffer
     import time
+
     while True:
         ret, frame = cap.read()
         print(frame.shape)
@@ -76,7 +75,7 @@ if __name__ == "__main__":
         # frame_flipped = np.flip(frame, axis=1)
         cv.imshow("name", cv.resize(frame, None, fx=0.5, fy=0.5))
         key = cv.waitKey(1) & 0xFF
-        if key == ord('q'):
+        if key == ord("q"):
             break
         time.sleep(5)
     cap.release()

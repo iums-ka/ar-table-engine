@@ -1,6 +1,7 @@
 [project]
-name = "ar-table-backend-service"
+name = "ar-table-engine"
 version = "0.1.0"
+requires-python = ">=3.12.10"
 
 dependencies = [
     "numpy<2",
@@ -11,9 +12,22 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "ruff>=0.15.8",
 ]
 
-[tool.pytest]
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
 minversion = "9.0"
 addopts = ["-ra", "--import-mode=importlib"]
 testpaths = ["tests"]
+
+[tool.ruff]
+fix = true
+
+[tool.ruff.lint]
+extend-select = ["D", "I", "EM"]
+ignore = ["D107"]
+pydocstyle = { convention = "google" }

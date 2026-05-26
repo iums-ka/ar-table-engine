@@ -1,11 +1,13 @@
 import platform
 from enum import Enum, auto
 
+
 class OS(Enum):
     WINDOWS = auto()
     LINUX = auto()
     MACOS = auto()
     UNKNOWN = auto()
+
 
 _system = platform.system().lower()
 

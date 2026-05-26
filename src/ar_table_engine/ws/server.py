@@ -1,8 +1,9 @@
 import asyncio
-import threading
 import json
-import websockets
+import threading
 from typing import Set
+
+import websockets
 
 
 class WebSocketServer:
