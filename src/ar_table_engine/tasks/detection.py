@@ -13,12 +13,9 @@ from ar_table_engine.ws.server import WebSocketServer
 
 def marker_payload(marker_id, x, y):
     return {
-        "Id": int(marker_id),
-        "MessageType": "CONTROLHOVER",
-        "Data": {
-            "X": float(x),
-            "Y": float(y),
-        },
+        "id": int(marker_id),
+        "x": float(x),
+        "y": float(y),
     }
 
 
