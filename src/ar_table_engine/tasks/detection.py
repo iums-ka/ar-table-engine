@@ -5,6 +5,7 @@ import numpy as np
 
 from ar_table_engine.utils.file_utils import load_config
 from ar_table_engine.utils.transform_utils import dist_to_map
+from ar_table_engine.utils.window import Window
 from ar_table_engine.vision.aruco.detection import ArucoMarkerDetector, Marker
 from ar_table_engine.vision.aruco.tracking import MarkerTracker
 from ar_table_engine.vision.camera import init_video_capture, preprocess_img
@@ -23,10 +24,11 @@ def markers_payload(markers):
     return {"markers": [marker_payload(m.id, m.center.X, m.center.Y) for m in markers]}
 
 
-def run_service(detector, marker_tracker, cap, ws, H, preprocess=False):
+def run_service(detector, marker_tracker, cap, ws, H, undistort=True, preprocess=False):
+    window = Window("Detection-Debug-Window")
     try:
-        WINDOW_NAME = "MAIN"
-        cv.namedWindow(WINDOW_NAME, cv.WINDOW_AUTOSIZE)
+        # WINDOW_NAME = "MAIN"
+        # cv.namedWindow(WINDOW_NAME, cv.WINDOW_AUTOSIZE)
 
         while True:
             ret, frame = cap.read()
@@ -36,7 +38,8 @@ def run_service(detector, marker_tracker, cap, ws, H, preprocess=False):
                 break
 
             # Undistortion
-            frame = cv.remap(frame, MAP_A, MAP_B, interpolation=cv.INTER_LINEAR)
+            if undistort:
+                frame = cv.remap(frame, MAP_A, MAP_B, interpolation=cv.INTER_LINEAR)
 
             detection_frame = preprocess_img(frame) if preprocess else frame
 
@@ -53,7 +56,8 @@ def run_service(detector, marker_tracker, cap, ws, H, preprocess=False):
             ws.broadcast(markers_payload(marker_tracker.get_tracked_markers()))
 
             # Debug view
-            cv.imshow(WINDOW_NAME, cv.resize(frame, None, fx=0.25, fy=0.25))
+            window.show(frame)
+            # cv.imshow(WINDOW_NAME, cv.resize(frame, None, fx=0.25, fy=0.25))
 
             if cv.waitKey(1) & 0xFF == ord("q"):
                 break
@@ -90,6 +94,8 @@ if __name__ == "__main__":
         CFG["camera"]["height"],
         CFG["camera"]["fps"],
     )
+    undistort = CFG["undistort"]
+    preprocess = CFG["preprocess"]
 
     grace_frames = 5
     min_observations = 5
@@ -99,12 +105,11 @@ if __name__ == "__main__":
     BOUNDING_BOX_H = np.load(os.path.join(CALIBRATION_DIR, "bounding_box_H.npy"))
     CAM_TO_PROJ_H = np.load(os.path.join(CALIBRATION_DIR, "cam_to_proj_H.npy"))
 
-    # This homopgrahpy assumes that any image displayed on the projector has been transformed
-    # using the bounding box homography.
+    # Currently we do not use the bounding box homography as we calibrate the bounding box / projection area using the projector itself (frontend agnostic)
     H = CAM_TO_PROJ_H
 
     # Init websocket
     ws = WebSocketServer(port=5001)
     ws.start()
 
-    run_service(detector, marker_tracker, cap, ws, H, True)
+    run_service(detector, marker_tracker, cap, ws, H, undistort, preprocess)
