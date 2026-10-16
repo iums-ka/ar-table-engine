@@ -1,21 +1,21 @@
-from enum import Enum
+from enum import Enum, auto
 
-from .detection import Marker
+from .marker import Marker
 
 
-class TrackedMarkerState(Enum):
-    INSTABLE = 0
-    STABLE = 1
-    STALE = 2
+class TrackingStatus(Enum):
+    UNSTABLE = auto()
+    STABLE = auto()
+    STALE = auto()
 
 
 class TrackedMarker:
-    def __init__(self, marker: Marker, marker_state: TrackedMarkerState):
-        self.state = marker_state
-        self.marker = marker
+    def __init__(self, marker: Marker):
+        self.tracking_status = TrackingStatus.UNSTABLE
         self.observed_frames = 0
         self.unobserved_frames = 0
-        # Further relevant states e.g. last_position for interpolation
+
+        self.marker = marker
 
 
 class MarkerTracker:
@@ -38,7 +38,7 @@ class MarkerTracker:
         # Add new tracked markers
         for mid, m in detected_map.items():
             if mid not in self._tracked_markers:
-                tm = TrackedMarker(m, TrackedMarkerState.INSTABLE)
+                tm = TrackedMarker(m)
                 self._tracked_markers[mid] = tm
                 self._update_observed(tm, m)
                 self._update_state(tm)
@@ -55,27 +55,30 @@ class MarkerTracker:
         tm.unobserved_frames += 1  # No need to cap since stale markers are culled
 
     def _update_state(self, tm: TrackedMarker):
-        match tm.state:
-            case TrackedMarkerState.INSTABLE:
+        match tm.tracking_status:
+            case TrackingStatus.UNSTABLE:
                 if tm.observed_frames >= self._min_observations:
-                    tm.state = TrackedMarkerState.STABLE
-            case TrackedMarkerState.STABLE:
+                    tm.tracking_status = TrackingStatus.STABLE
+            case TrackingStatus.STABLE:
                 if tm.unobserved_frames > self._grace_frames:
-                    tm.state = TrackedMarkerState.STALE
+                    tm.tracking_status = TrackingStatus.STALE
 
     def _cull(self):
         stale_ids = [
             tid
             for tid, tm in self._tracked_markers.items()
-            if tm.state == TrackedMarkerState.STALE
+            if tm.tracking_status == TrackingStatus.STALE
         ]
 
         for tid in stale_ids:
             del self._tracked_markers[tid]
 
-    def get_tracked_markers(self):
+    def get_stable_markers(self):
         return [
             tm.marker
             for tm in self._tracked_markers.values()
-            if tm.state == TrackedMarkerState.STABLE
+            if tm.tracking_status == TrackingStatus.STABLE
         ]
+
+    def get_tracked_markers(self):
+        return [tm for tm in self._tracked_markers.values()]

@@ -6,12 +6,12 @@ import numpy as np
 
 from ar_table_engine.utils.file_utils import load_config
 from ar_table_engine.utils.transform_utils import dist_to_map
-from ar_table_engine.vision.aruco.detection import ArucoMarkerDetector
+from ar_table_engine.vision.aruco.detection import MarkerDetector
 from ar_table_engine.vision.camera import init_video_capture
 
 
 def _detect_markers_with_attempts(
-    detector: ArucoMarkerDetector, expected_count: int = None
+    detector: MarkerDetector, expected_count: int = None
 ) -> tuple:
     """@public
     Try capturing markers up to MAX_NR_OF_ATTEMPTS times.
@@ -331,11 +331,11 @@ if __name__ == "__main__":
         y=CFG["projector"]["screen_position"][1],
     )
     cv.setWindowProperty(WNAME, cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
-    DETECTOR_PHYS = ArucoMarkerDetector(
+    DETECTOR_PHYS = MarkerDetector(
         CFG["aruco_detection"]["physical_marker_dict"],
         CFG["aruco_detection"]["detector_parameters"],
     )
-    DETECTOR_PROJ = ArucoMarkerDetector(
+    DETECTOR_PROJ = MarkerDetector(
         CFG["aruco_detection"]["projected_marker_dict"],
         CFG["aruco_detection"]["detector_parameters"],
     )
