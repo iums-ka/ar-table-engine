@@ -48,8 +48,6 @@ ar-table-engine/
 
 ```
 
----
-
 ## Requirements
 
 - Python ≥ 3.12.10
@@ -217,28 +215,24 @@ Detected markers are broadcast as JSON messages in the following format:
 {
   "markers": [
     {
-      "Id": 12,
-      "MessageType": "CONTROLHOVER",
-      "Data": {
-        "X": 560,
-        "Y": 726
-      }
+      "id": 12,
+      "x": 560,
+      "y": 726,
+      "orientation": [0.56, 0.71]
     },
     {
       "Id": 7,
-      "MessageType": "CONTROLHOVER",
-      "Data": {
-        "X": 2103,
-        "Y": 302,
-      }
+      "x": 2103,
+      "y": 302,
+      "orientation": [-0.13, 0.34]
     }
   ]
 }
 ```
 
-* **Id**: Marker ID
-* **X / Y**: Marker center position in projector screen space (origin in top left) - in the future we will switch to normalized coordinates.
-* **MessageType**: Fixed message type for downstream consumers
+* **id**: The marker's ID within the configured ArUco dictionary.
+* **x / y**: The marker's center position in the canonical coordinate system, with the origin at the top-left corner.
+* **orientation**: A two-dimensional orientation vector [x, y] expressed in the canonical coordinate system. Each component is in the range [-1, 1].
 
 ---
 
