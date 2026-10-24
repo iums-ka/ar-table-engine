@@ -312,7 +312,7 @@ if __name__ == "__main__":
     CFG = load_config(r"./data/config.json")
 
     # Load intrinsics
-    intrinsics = np.load(os.path.join("./data/calibration", "undistortion_args.npz"))
+    intrinsics = np.load(os.path.join("./data/calibration", "output_2160p.npz"))
     camMtx = intrinsics["camMtx"]
     distCoeffs = intrinsics["distCoeff"]
     camMtxNew = intrinsics["camMtxNew"]

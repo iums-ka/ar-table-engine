@@ -1,5 +1,7 @@
 import os
+import time
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 import cv2 as cv
 import numpy as np
@@ -49,6 +51,10 @@ def run_service(
     preprocess=False,
 ):
     window = Window("Detection-Debug-Window")
+
+    fps = 0.0
+    previous_frame_time = time.perf_counter()
+
     try:
         while True:
             ret, frame = cap.read()
@@ -63,35 +69,70 @@ def run_service(
 
             detection_frame = preprocess_img(frame) if preprocess else frame
 
-            # Detection
+            # Detection: measure only the detector call
+            detect_start = time.perf_counter()
+            corners, ids = detector.detect(detection_frame)
+            # print(corners)
+            detect_end = time.perf_counter()
+
+            detect_ms = (detect_end - detect_start) * 1000.0
+
+            # Detection results
             markers = []
             markers_tf = []
-            corners, ids = detector.detect(detection_frame)
+            marker_count = 0
+
             if corners is not None and ids is not None:
+                marker_count = len(ids)
+
                 corners_tf = [cv.perspectiveTransform(c, H) for c in corners]
+
                 markers = markers_from_arrays(corners, ids)
                 markers_tf = markers_from_arrays(corners_tf, ids)
+
                 frame = cv.aruco.drawDetectedMarkers(frame, corners, ids)
 
             # Broadcast tracked markers
             marker_tracker.update(markers_tf)
             stable = marker_tracker.get_stable_markers()
 
-            # print(stable)
-            # tracked = marker_tracker.get_tracked_markers()
-            # print([t.observed_frames for t in tracked])
-            # print([t.tracking_status for t in tracked])
-            # print([t.marker.id for t in tracked])
-
             payload = markers_payload(stable)
             ws.broadcast(payload)
 
+            # Draw marker orientation
             draw_marker_orientations(frame, markers, 100)
+
+            # Estimate end-to-end loop FPS, smoothed like the C++ version
+            now = time.perf_counter()
+            dt = now - previous_frame_time
+            previous_frame_time = now
+
+            if dt > 0.0:
+                instant_fps = 1.0 / dt
+                fps = instant_fps if fps == 0.0 else 0.9 * fps + 0.1 * instant_fps
+
+            # Debug overlay
+            debug_text = (
+                f"Nano: {marker_count} markers"
+                f" | detect: {detect_ms:.1f} ms"
+                f" | FPS: {fps:.1f}"
+            )
+
+            cv.putText(
+                frame,
+                debug_text,
+                (30, 50),
+                cv.FONT_HERSHEY_SIMPLEX,
+                1.0,
+                (0, 255, 0),
+                2,
+                cv.LINE_AA,
+            )
 
             # Debug view
             window.show(frame)
 
-            if cv.waitKey(1) & 0xFF == ord("q"):
+            if cv.pollKey() & 0xFF == ord("q"):
                 break
 
     finally:
@@ -104,11 +145,15 @@ def run_service(
 if __name__ == "__main__":
     CFG = load_config(r"./data/config.json")
     # Load calibration
-    intrinsics = np.load(os.path.join("./data/calibration", "undistortion_args.npz"))
+    intrinsics_path = Path(CFG["intrinsics_path"])
+    intrinsics = np.load(intrinsics_path)
+
     camMtx = intrinsics["camMtx"]
     distCoeffs = intrinsics["distCoeff"]
     camMtxNew = intrinsics["camMtxNew"]
 
+    print(camMtx, distCoeffs, camMtxNew)
+    # exit()
     # TODO: add to camera class
     MAP_A, MAP_B = dist_to_map(
         camMtx, distCoeffs, camMtxNew, CFG["camera"]["width"], CFG["camera"]["height"]
@@ -116,7 +161,7 @@ if __name__ == "__main__":
 
     detector = MarkerDetector(
         CFG["aruco_detection"]["physical_marker_dict"],
-        CFG["aruco_detection"]["detector_parameters"],
+        CFG["aruco_detection"].get("detector_parameters"),
     )
 
     # Init camera
@@ -126,6 +171,7 @@ if __name__ == "__main__":
         CFG["camera"]["height"],
         CFG["camera"]["fps"],
     )
+
     undistort = CFG["undistort"]
     preprocess = CFG["preprocess"]
 
@@ -135,10 +181,7 @@ if __name__ == "__main__":
 
     CALIBRATION_DIR = r"./data/calibration"
     BOUNDING_BOX_H = np.load(os.path.join(CALIBRATION_DIR, "bounding_box_H.npy"))
-    # CAM_TO_PROJ_H = np.load(os.path.join(CALIBRATION_DIR, "cam_to_proj_H.npy"))
-    CAM_TO_PROJ_H = np.identity(3)
-
-    CAM_TO_PROJ_H = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    CAM_TO_PROJ_H = np.load(os.path.join(CALIBRATION_DIR, "cam_to_proj_H.npy"))
 
     # Currently we do not use the bounding box homography as we calibrate the bounding box / projection area using the projector itself (frontend agnostic)
     H = CAM_TO_PROJ_H

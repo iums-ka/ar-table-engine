@@ -1,17 +1,20 @@
 [project]
 name = "ar-table-engine"
 version = "0.1.0"
-requires-python = ">=3.12.10"
+requires-python = ">=3.12.10,<3.13"
 
 dependencies = [
-    "numpy<2",
+    "numpy>=1.26,<2",
     "opencv-python==4.11.0.86",
     "websockets",
+    "python-dotenv>=1.2.4",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
+    "cmake>=3.20",
+    "pybind11>=3.1.0",
+    "pytest>=9.0",
     "ruff>=0.15.8",
 ]
 
@@ -25,7 +28,7 @@ addopts = ["-ra", "--import-mode=importlib"]
 testpaths = ["tests"]
 
 [tool.ruff]
-fix = true
+fix = false
 
 [tool.ruff.lint]
 extend-select = ["D", "I", "EM"]

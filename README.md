@@ -22,9 +22,10 @@ It does not contain any application-specific logic or user-facing features. Inst
 
 
 ## Project Structure (Relevant Parts Only)
-See [src layout](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/) for further details.
-```
 
+See [src layout vs. flat layout](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/) for further details.
+
+```text
 ar-table-engine/
 ├── pyproject.toml
 ├── README.md
@@ -33,38 +34,112 @@ ar-table-engine/
 │
 ├── data/
 │   ├── config.json
-│   └── calibration/                 # Intrinsics and homography
+│   └── calibration/                 # Camera intrinsics and homography
+│
+├── native/
+│   └── aruco_nano/
+│       ├── aruco_nano.h             # Native ArUco Nano implementation
+│       ├── python_bindings.cpp      # pybind11 bindings
+│       └── CMakeLists.txt           # Native extension build configuration
+│
+├── scripts/
+│   └── build_native.py              # Builds the native Python extension
 │
 ├── src/
 │   └── ar_table_engine/
 │       ├── __init__.py
-│       ├── tasks/                   # Calibration, detection, websocket broadcast          
+│       ├── tasks/                   # Calibration, detection, WebSocket broadcast
 │       ├── utils/
-│       ├── vision/                  # ArUco and more
+│       ├── vision/                  # ArUco detection and other vision components
+│       │   └── aruco/
+│       │       ├── detection.py
+│       │       └── aruco_nano_ext.cp312-win_amd64.pyd
 │       └── ws/
+│
+├── build/                           # Generated native build files
 │
 └── tests/
     └── ...
-
 ```
+
 
 ## Requirements
 
-- Python ≥ 3.12.10
-- Optimally, a Logitech C925e, Logitech Brio or other camera that works well with OpenCV
-- Projector (for calibration)
+### Software
 
----
+- **Python 3.12.10** (Python `>=3.12.10,<3.13` is supported).
+- **[uv](https://docs.astral.sh/uv/)** for Python environment and dependency management.
+- **CMake 3.20 or newer** for building the native ArUco Nano extension.
+- **C++ compiler:** [Visual Studio Community](https://visualstudio.microsoft.com/de/vs/community/) on Windows, with the _Desktop development with C++_ workload installed, including MSVC and a Windows SDK.
+- **[OpenCV 4.11](https://opencv.org/releases/)** native C++ libraries and development files, including headers, libraries, and runtime DLLs. The native extension must be built against a compatible OpenCV installation.
+
+The Python OpenCV dependency (`opencv-python==4.11.0.86`) is installed automatically by `uv`.
+
+### Hardware
+
+- **Camera:** A Logitech C925e, Logitech Brio, or another camera that works reliably with OpenCV. A stable frame rate and sufficient image resolution are recommended.
+- **Projector:** Required for projector-camera calibration and projected marker detection.
+- **Display setup:** A monitor and projector configuration suitable for the intended table and projection area.
 
 ## Installation
 
-From the project root:
+### 1. Clone the repository
+
+Clone the repository and open a terminal in the project root.
+
+### 2. Install Python dependencies
 
 ```bash
-uv sync --extra dev  # includes pytest and such 
+uv sync --extra dev
 ```
 
----
+This creates or updates the project environment and installs the runtime and development dependencies, including CMake, pybind11, pytest, and Ruff.
+
+### 3. Configure the native OpenCV installation
+
+The ArUco Nano Python extension uses native OpenCV C++ libraries. Install or build a compatible OpenCV 4.11 C++ distribution and configure the `OPENCV_ROOT` environment variable to point to its root directory.
+
+For example, on Windows, the directory should contain an OpenCV `bin` directory with runtime DLLs and a `lib` directory containing `OpenCVConfig.cmake` and the required libraries.
+
+Create a local `.env` file in the project root and set:
+
+```dotenv
+OPENCV_ROOT=C:/path/to/opencv
+```
+
+Replace the example path with the location of your OpenCV installation. Keep `.env` local and do not commit machine-specific paths.
+
+### 4. Build the native ArUco Nano extension
+
+From the project root, run:
+
+```bash
+uv run python scripts/build_native.py
+```
+
+This configures and builds the native extension using the configured OpenCV installation.
+
+If you change the OpenCV version or installation, rebuild the extension against the corresponding native libraries.
+
+### 5. Verify the installation
+
+Run the test suite:
+
+```bash
+uv run pytest
+```
+
+You can also verify that the native extension imports successfully:
+
+```bash
+uv run python -c "from ar_table_engine.vision.aruco import aruco_nano_ext; print('ArUco Nano extension loaded successfully')"
+```
+
+
+
+
+
+
 
 ## Configuration (`config.json`)
 
@@ -137,27 +212,39 @@ Resolution of the primary monitor. Used for correct window placement.
 ### ArUco Detection
 
 ```json
-"aruco_detection": {
+{
+  "aruco_detection": {
     "physical_marker_dict": "DICT_4X4_250",
     "projected_marker_dict": "DICT_5X5_250",
     "detector_parameters": {
-        "perspectiveRemoveIgnoredMarginPerCell": 0.1,
-        "perspectiveRemovePixelPerCell": 4,
-        "errorCorrectionRate": 0.5
+      "error_correction_rate": 0.0,
+      "min_size": 10,
+      "max_attempts_per_candidate": 5,
+      "detect_inverted_marker": false
     }
+  }
 }
 ```
 
-* **physical_marker_dict**
-  Dictionary used for **real, printed markers** visible to the camera.
+- **`physical_marker_dict`**  
+  Dictionary used for **real, printed markers** detected by the camera.
 
-* **projected_marker_dict**
-  Dictionary used for **markers projected onto the table** during calibration.
+- **`projected_marker_dict`**  
+  Dictionary used for **markers projected onto the table**, for example during calibration.
 
-  ⚠️ **These should be different dictionaries** to avoid false detections and ambiguity.
+  ⚠️ **Use different dictionaries** for physical and projected markers to reduce ambiguity and prevent one type from being mistaken for the other.
 
-* **detector_parameters**
-  Fine-tuning parameters for OpenCV’s ArUco detector. These can generally be ignored unless detection issues arise.
+- **`detector_parameters`** _(optional)_  
+  Optional fine-tuning parameters for the ArUco Nano detector. If omitted, the native detector defaults are used.
+
+  | Parameter | Description |
+  |---|---|
+  | `error_correction_rate` | Controls the amount of bit-error correction permitted during marker identification. Higher values may improve detection of imperfect markers but can increase false positives. |
+  | `min_size` | Minimum contour side length for a candidate marker. Lower values can help detect smaller markers; higher values may reject noise but miss distant markers. |
+  | `max_attempts_per_candidate` | Maximum number of attempts to identify a candidate while slightly adjusting its corners. More attempts may improve detection at additional computational cost. |
+  | `detect_inverted_marker` | Enables detection of inverted markers, such as light markers on a dark background. Keep `false` for conventional dark markers on a light background. |
+
+  These parameters can generally be left at their defaults initially and tuned if detection reliability or performance needs improvement. Parameter names must match the names exposed by the Python binding, using `snake_case`.
 
 ---
 
