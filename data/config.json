@@ -1,13 +1,15 @@
 {
     "camera": {
-        "width": 3840,
-        "height": 2160,
+        "width": 2560,
+        "height": 1440,
         "index": 0,
         "fps": 30
     },
     "undistort": true,
-    "intrinsics_path": "C:/Users/ExploraVision/Src/Ethan/ar-table-engine/data/calibration/yealinkuvc30_2160p.npz",
-    "preprocess": false,
+    "intrinsics_path": "C:/Users/ExploraVision/Src/Ethan/ar-table-engine/data/calibration/yealinkuvc30_1440p.npz",
+    "debug": false,
+    "grace_frames": 3,
+    "min_observations": 3,
     "projector": {
         "width": 3840,
         "height": 2160,

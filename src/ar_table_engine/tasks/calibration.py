@@ -1,5 +1,6 @@
 import os
 import time
+from pathlib import Path
 
 import cv2 as cv
 import numpy as np
@@ -312,7 +313,8 @@ if __name__ == "__main__":
     CFG = load_config(r"./data/config.json")
 
     # Load intrinsics
-    intrinsics = np.load(os.path.join("./data/calibration", "output_2160p.npz"))
+    intrinsics_path = Path(CFG["intrinsics_path"])
+    intrinsics = np.load(intrinsics_path)
     camMtx = intrinsics["camMtx"]
     distCoeffs = intrinsics["distCoeff"]
     camMtxNew = intrinsics["camMtxNew"]
@@ -333,11 +335,11 @@ if __name__ == "__main__":
     cv.setWindowProperty(WNAME, cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
     DETECTOR_PHYS = MarkerDetector(
         CFG["aruco_detection"]["physical_marker_dict"],
-        CFG["aruco_detection"]["detector_parameters"],
+        CFG["aruco_detection"].get("detector_parameters"),
     )
     DETECTOR_PROJ = MarkerDetector(
         CFG["aruco_detection"]["projected_marker_dict"],
-        CFG["aruco_detection"]["detector_parameters"],
+        CFG["aruco_detection"].get("detector_parameters"),
     )
 
     WHITE_IMG = (

@@ -13,8 +13,10 @@ from ar_table_engine.utils.window import Window
 from ar_table_engine.vision.aruco.detection import MarkerDetector
 from ar_table_engine.vision.aruco.marker import Marker, markers_from_arrays
 from ar_table_engine.vision.aruco.tracking import MarkerTracker
-from ar_table_engine.vision.camera import init_video_capture, preprocess_img
+from ar_table_engine.vision.camera import init_video_capture
 from ar_table_engine.ws.server import WebSocketServer
+
+Window.__base__
 
 
 @dataclass
@@ -41,6 +43,24 @@ def markers_payload(markers: list[Marker]):
     }
 
 
+def _add_debug_overlay(frame, marker_count, detect_ms, fps):
+    # Debug overlay
+    debug_text = (
+        f"Nano: {marker_count} markers | detect: {detect_ms:.1f} ms | FPS: {fps:.1f}"
+    )
+
+    cv.putText(
+        frame,
+        debug_text,
+        (30, 50),
+        cv.FONT_HERSHEY_SIMPLEX,
+        1.0,
+        (0, 255, 0),
+        2,
+        cv.LINE_AA,
+    )
+
+
 def run_service(
     detector: MarkerDetector,
     marker_tracker: MarkerTracker,
@@ -48,9 +68,10 @@ def run_service(
     ws: WebSocketServer,
     H: np.ndarray,
     undistort=True,
-    preprocess=False,
+    debug=False,
 ):
-    window = Window("Detection-Debug-Window")
+    if debug:
+        window = Window("Detection-Debug-Window")
 
     fps = 0.0
     previous_frame_time = time.perf_counter()
@@ -67,11 +88,9 @@ def run_service(
             if undistort:
                 frame = cv.remap(frame, MAP_A, MAP_B, interpolation=cv.INTER_LINEAR)
 
-            detection_frame = preprocess_img(frame) if preprocess else frame
-
             # Detection: measure only the detector call
             detect_start = time.perf_counter()
-            corners, ids = detector.detect(detection_frame)
+            corners, ids = detector.detect(frame)
             # print(corners)
             detect_end = time.perf_counter()
 
@@ -111,29 +130,14 @@ def run_service(
                 instant_fps = 1.0 / dt
                 fps = instant_fps if fps == 0.0 else 0.9 * fps + 0.1 * instant_fps
 
-            # Debug overlay
-            debug_text = (
-                f"Nano: {marker_count} markers"
-                f" | detect: {detect_ms:.1f} ms"
-                f" | FPS: {fps:.1f}"
-            )
+            if debug:
+                _add_debug_overlay(frame, marker_count, detect_ms, fps)
 
-            cv.putText(
-                frame,
-                debug_text,
-                (30, 50),
-                cv.FONT_HERSHEY_SIMPLEX,
-                1.0,
-                (0, 255, 0),
-                2,
-                cv.LINE_AA,
-            )
+                # Debug view
+                window.show(frame)
 
-            # Debug view
-            window.show(frame)
-
-            if cv.pollKey() & 0xFF == ord("q"):
-                break
+                if cv.pollKey() & 0xFF == ord("q"):
+                    break
 
     finally:
         print("Shutting down...")
@@ -173,10 +177,10 @@ if __name__ == "__main__":
     )
 
     undistort = CFG["undistort"]
-    preprocess = CFG["preprocess"]
+    debug = CFG["debug"]
+    grace_frames = CFG["grace_frames"]
+    min_observations = CFG["min_observations"]
 
-    grace_frames = 5
-    min_observations = 5
     marker_tracker = MarkerTracker(grace_frames, min_observations)
 
     CALIBRATION_DIR = r"./data/calibration"
@@ -190,4 +194,4 @@ if __name__ == "__main__":
     ws = WebSocketServer(port=5001)
     ws.start()
 
-    run_service(detector, marker_tracker, cap, ws, H, undistort, preprocess)
+    run_service(detector, marker_tracker, cap, ws, H, undistort, debug)
