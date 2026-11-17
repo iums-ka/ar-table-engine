@@ -7,7 +7,7 @@
     },
     "undistort": true,
     "intrinsics_path": "C:/Users/ExploraVision_SG/code/ar-table-engine/data/calibration/yealinkuvc30_1440p.npz",
-    "debug": false,
+    "detection_debug": false,
     "grace_frames": 3,
     "min_observations": 3,
     "projector": {

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import cv2 as cv
 import numpy as np
+from dotenv import load_dotenv
 
 from ar_table_engine.utils.drawing import draw_marker_orientations
 from ar_table_engine.utils.file_utils import load_config
@@ -15,8 +16,6 @@ from ar_table_engine.vision.aruco.marker import Marker, markers_from_arrays
 from ar_table_engine.vision.aruco.tracking import MarkerTracker
 from ar_table_engine.vision.camera import init_video_capture
 from ar_table_engine.ws.server import WebSocketServer
-
-Window.__base__
 
 
 @dataclass
@@ -147,7 +146,11 @@ def run_service(
 
 
 if __name__ == "__main__":
-    CFG = load_config(r"./data/config.json")
+    PROJECT_ROOT = Path(__file__).resolve().parents[3]
+    load_dotenv(PROJECT_ROOT / ".env")
+    CFG_PATH = os.environ.get("CONFIG_PATH")
+    CFG = load_config(CFG_PATH)
+
     # Load calibration
     intrinsics_path = Path(CFG["intrinsics_path"])
     intrinsics = np.load(intrinsics_path)
@@ -176,15 +179,14 @@ if __name__ == "__main__":
         CFG["camera"]["fps"],
     )
 
-    undistort = CFG["undistort"]
-    debug = CFG["debug"]
-    grace_frames = CFG["grace_frames"]
-    min_observations = CFG["min_observations"]
+    undistort = CFG.get("undistort", True)
+    debug = CFG.get("detection_debug", False)
+    grace_frames = CFG.get("grace_frames", 3)
+    min_observations = CFG.get("min_observations", 3)
 
     marker_tracker = MarkerTracker(grace_frames, min_observations)
 
     CALIBRATION_DIR = r"./data/calibration"
-    BOUNDING_BOX_H = np.load(os.path.join(CALIBRATION_DIR, "bounding_box_H.npy"))
     CAM_TO_PROJ_H = np.load(os.path.join(CALIBRATION_DIR, "cam_to_proj_H.npy"))
 
     # Currently we do not use the bounding box homography as we calibrate the bounding box / projection area using the projector itself (frontend agnostic)
