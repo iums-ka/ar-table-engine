@@ -159,8 +159,6 @@ if __name__ == "__main__":
     distCoeffs = intrinsics["distCoeff"]
     camMtxNew = intrinsics["camMtxNew"]
 
-    print(camMtx, distCoeffs, camMtxNew)
-    # exit()
     # TODO: add to camera class
     MAP_A, MAP_B = dist_to_map(
         camMtx, distCoeffs, camMtxNew, CFG["camera"]["width"], CFG["camera"]["height"]

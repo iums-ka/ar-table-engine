@@ -13,7 +13,7 @@ This project includes AR Table (camera-projector-system) calibration logic (enco
 - Streaming spatial data via WebSocket
 
 ### What the engine does not do
-It does not contain any application-specific logic or user-facing features. Instead, it exposes raw spatial information (e.g. position, rotation (WIP)) to downstream tasks such as frontend applications that further interpret these results to enable meaningful interactions.
+It does not contain any application-specific logic or user-facing features. Instead, it exposes raw spatial information (e.g. position, orientation) to downstream tasks such as frontend applications that further interpret these results to enable meaningful interactions.
 
 ## Related Repositories
 
@@ -109,15 +109,18 @@ OPENCV_ROOT=C:/path/to/opencv
 
 Replace the example path with the location of your OpenCV installation. Keep `.env` local and do not commit machine-specific paths.
 
+
 ### 4. Build the native ArUco Nano extension
 
-From the project root, run:
+The native extension requires a C++ build environment. On Windows, the easiest option is to use the **Developer Command Prompt for Visual Studio**, which configures the required compiler and build tools.
+
+Open the Developer Command Prompt, navigate to the project root, and run:
 
 ```bash
 uv run python scripts/build_native.py
 ```
 
-This configures and builds the native extension using the configured OpenCV installation.
+This configures and builds the native extension against the configured OpenCV installation.
 
 If you change the OpenCV version or installation, rebuild the extension against the corresponding native libraries.
 
