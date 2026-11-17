@@ -4,45 +4,99 @@ from pathlib import Path
 
 import cv2 as cv
 import numpy as np
+from dotenv import load_dotenv
 
 from ar_table_engine.utils.file_utils import load_config
 from ar_table_engine.utils.transform_utils import dist_to_map
 from ar_table_engine.vision.aruco.detection import MarkerDetector
 from ar_table_engine.vision.camera import init_video_capture
 
+# def _detect_markers_with_attempts(
+#     detector: MarkerDetector, expected_count: int = None
+# ) -> tuple:
+#     """@public
+#     Try capturing markers up to MAX_NR_OF_ATTEMPTS times.
+#     Return detected corners and ids; exit if markers cannot be detected reliably.
+#     """
+#     for attempt in range(1, MAX_NR_OF_ATTEMPTS + 1):
+#         frame = _get_most_recent_frame()
+#         if frame is None or np.mean(frame) < 5:
+#             print("Captured image is black, skipping frame.")
+#             continue
+
+#         corners, ids = detector.detect(frame, DEBUG)
+#         if ids is not None:
+#             num_ids = len(ids)
+#             if expected_count:
+#                 if num_ids > expected_count:
+#                     print(
+#                         f"Detected {num_ids} markers, expected {expected_count}. Assume setup or settings are wrong; exiting."
+#                     )
+#                     os._exit(0)
+#                 elif num_ids == expected_count:
+#                     print(f"Detected {expected_count} markers on attempt {attempt}.")
+#                     return corners, ids
+#             else:
+#                 return corners, ids
+
+#     print(
+#         f"Failed to detect expected markers in {MAX_NR_OF_ATTEMPTS} attempts. Assume setup or settings are wrong; exiting."
+#     )
+#     os._exit(0)
+
 
 def _detect_markers_with_attempts(
-    detector: MarkerDetector, expected_count: int = None
+    detector: MarkerDetector,
+    expected_count: int = None,
+    min_count: int = None,
 ) -> tuple:
     """@public
-    Try capturing markers up to MAX_NR_OF_ATTEMPTS times.
-    Return detected corners and ids; exit if markers cannot be detected reliably.
+    Try detecting ArUco markers up to MAX_NR_OF_ATTEMPTS times.
+
+    Args:
+        detector: ArUco marker detector.
+        expected_count: Require exactly this many markers.
+        min_count: Require at least this many markers.
+
+    Returns:
+        Tuple of detected corners and IDs.
+
+    Raises:
+        RuntimeError: If the required number of markers cannot be detected.
     """
+    if expected_count is not None and min_count is not None:
+        raise ValueError("Specify either expected_count or min_count, not both.")
+
     for attempt in range(1, MAX_NR_OF_ATTEMPTS + 1):
         frame = _get_most_recent_frame()
+
         if frame is None or np.mean(frame) < 5:
-            print("Captured image is black, skipping frame.")
+            print("Captured image is black or invalid, skipping frame.")
             continue
 
         corners, ids = detector.detect(frame, DEBUG)
-        if ids is not None:
-            num_ids = len(ids)
-            if expected_count:
-                if num_ids > expected_count:
-                    print(
-                        f"Detected {num_ids} markers, expected {expected_count}. Assume setup or settings are wrong; exiting."
-                    )
-                    os._exit(0)
-                elif num_ids == expected_count:
-                    print(f"Detected {expected_count} markers on attempt {attempt}.")
-                    return corners, ids
-            else:
-                return corners, ids
+        num_ids = len(ids) if ids is not None else 0
 
-    print(
-        f"Failed to detect expected markers in {MAX_NR_OF_ATTEMPTS} attempts. Assume setup or settings are wrong; exiting."
+        if expected_count is not None:
+            success = num_ids == expected_count
+        elif min_count is not None:
+            success = num_ids >= min_count
+        else:
+            success = num_ids > 0
+
+        if success:
+            print(f"Detected {num_ids} markers on attempt {attempt}.")
+            return corners, ids
+
+        print(
+            f"Attempt {attempt}/{MAX_NR_OF_ATTEMPTS}: "
+            f"Detected {num_ids} markers, "
+            f"required {'exactly ' + str(expected_count) if expected_count is not None else 'at least ' + str(min_count) if min_count is not None else 'at least 1'}."
+        )
+
+    raise RuntimeError(
+        f"Failed to detect required markers after {MAX_NR_OF_ATTEMPTS} attempts."
     )
-    os._exit(0)
 
 
 def _extract_common_corners(
@@ -60,8 +114,7 @@ def _extract_common_corners(
         common_ids: list of int
     """
     if ids_a is None or ids_b is None:
-        print("No markers detected in one of the images. Exiting.")
-        os._exit(0)
+        raise RuntimeError("No markers detected in one of the images.")
 
     # Flatten and ensure integer type
     ids_a = np.asarray(ids_a).flatten().astype(int)
@@ -78,11 +131,11 @@ def _extract_common_corners(
     # Find intersection of detected IDs
     common_ids = sorted(set(ids_a).intersection(proj_ids))
 
-    if not common_ids:
-        print(
-            "No common markers detected between projected and captured images. Exiting."
+    if len(common_ids) < 4:
+        raise RuntimeError(
+            f"Insufficient common ArUco markers: "
+            f"detected {len(common_ids)}, required at least 4."
         )
-        os._exit(0)
 
     # Collect corresponding corners in the same sorted order
     common_grid_corners = np.concatenate(
@@ -133,12 +186,18 @@ def _calibrate_camera_to_projector(flip_projector_M):
         (CFG["projector"]["width"], CFG["projector"]["height"]),
     )
 
-    cv.imshow(WNAME, aruco_grid_flipped)
-    cv.waitKey(1)
-    time.sleep(1)
+    _show_calibration_pattern(
+        aruco_grid_flipped,
+        "Projecting ArUco grid.",
+    )
+
+    # aruco_corners_camera, aruco_ids_camera = _detect_markers_with_attempts(
+    #     DETECTOR_PROJ
+    # )
 
     aruco_corners_camera, aruco_ids_camera = _detect_markers_with_attempts(
-        DETECTOR_PROJ
+        DETECTOR_PROJ,
+        min_count=4,
     )
 
     # Convert to projector coordinate system (potentially flipped canonical coordinate frame)
@@ -157,9 +216,25 @@ def _calibrate_camera_to_projector(flip_projector_M):
         aruco_ids_camera,
     )
 
+    # camera_to_projector_H, _ = cv.findHomography(
+    #     np.array(common_corners_camera), np.array(common_corners_projector)
+    # )
+    # return camera_to_projector_H
     camera_to_projector_H, _ = cv.findHomography(
-        np.array(common_corners_camera), np.array(common_corners_projector)
+        common_corners_camera,
+        common_corners_projector,
     )
+
+    if camera_to_projector_H is None:
+        raise RuntimeError("Camera-to-projector homography estimation failed.")
+
+    _print_homography_metrics(
+        camera_to_projector_H,
+        common_corners_camera,
+        common_corners_projector,
+        "Camera-to-projector",
+    )
+
     return camera_to_projector_H
 
 
@@ -254,9 +329,14 @@ def _calibrate_bounding_box(camera_to_projector_H: np.ndarray, flip_M) -> tuple:
     """@public
     Detect physical ArUco markers at table corners and compute bounding box homography.
     """
-    cv.imshow(WNAME, WHITE_IMG)
-    cv.waitKey(1)
-    time.sleep(1)  # Ensure white image is being displayed
+    # cv.imshow(WNAME, WHITE_IMG)
+    # cv.waitKey(1)
+    # time.sleep(1)  # Ensure white image is being displayed
+
+    _show_calibration_pattern(
+        WHITE_IMG,
+        "Projecting white image for physical marker detection.",
+    )
 
     aruco_corners_camera, _ = _detect_markers_with_attempts(
         DETECTOR_PHYS, expected_count=4
@@ -276,7 +356,29 @@ def _calibrate_bounding_box(camera_to_projector_H: np.ndarray, flip_M) -> tuple:
 
     src_pts_projector = cv.perspectiveTransform(src_pts_canonical, flip_M)
 
-    bounding_box_H, _ = cv.findHomography(src_pts_projector, dst_pts_projector)
+    # bounding_box_H, _ = cv.findHomography(src_pts_projector, dst_pts_projector)
+    # return bounding_box_H
+    bounding_box_H, _ = cv.findHomography(
+        src_pts_projector,
+        dst_pts_projector,
+    )
+
+    if bounding_box_H is None:
+        raise RuntimeError("Bounding-box homography estimation failed.")
+
+    _print_homography_metrics(
+        bounding_box_H,
+        src_pts_projector,
+        dst_pts_projector,
+        "Bounding-box",
+    )
+
+    _print_bounding_box_metrics(
+        dst_pts_projector,
+        w,
+        h,
+    )
+
     return bounding_box_H
 
 
@@ -294,23 +396,98 @@ def _build_flip_matrix(width, height, flip_h: bool, flip_v: bool):
     return M
 
 
+# def _get_most_recent_frame():
+#     # Cant rely on setting buffersize to 1, so we have to do this s***
+#     cap = init_video_capture(
+#         CFG["camera"]["index"],
+#         CFG["camera"]["width"],
+#         CFG["camera"]["height"],
+#         CFG["camera"]["fps"],
+#     )
+#     _, frame = cap.read()
+#     cap.release()
+#     frame = cv.remap(frame.copy(), MAP_A, MAP_B, interpolation=cv.INTER_LINEAR)
+#     return frame
+
+
 def _get_most_recent_frame():
-    # Cant rely on setting buffersize to 1, so we have to do this s***
     cap = init_video_capture(
         CFG["camera"]["index"],
         CFG["camera"]["width"],
         CFG["camera"]["height"],
         CFG["camera"]["fps"],
     )
-    _, frame = cap.read()
-    cap.release()
-    frame = cv.remap(frame.copy(), MAP_A, MAP_B, interpolation=cv.INTER_LINEAR)
-    return frame
+
+    try:
+        success, frame = cap.read()
+    finally:
+        cap.release()
+
+    if not success or frame is None:
+        return None
+
+    return cv.remap(
+        frame,
+        MAP_A,
+        MAP_B,
+        interpolation=cv.INTER_LINEAR,
+    )
+
+
+def _print_homography_metrics(H, src_pts, dst_pts, name):
+    """Print reprojection metrics for a computed homography."""
+    src = np.asarray(src_pts, dtype=np.float32).reshape(-1, 1, 2)
+    dst = np.asarray(dst_pts, dtype=np.float32).reshape(-1, 2)
+
+    projected = cv.perspectiveTransform(src, H).reshape(-1, 2)
+    errors = np.linalg.norm(projected - dst, axis=1)
+
+    rmse = np.sqrt(np.mean(errors**2))
+
+    print(f"\n{name} calibration metrics:")
+    print(f"  Correspondences: {len(errors)}")
+    print(f"  Reprojection RMSE: {rmse:.3f} px")
+    print(f"  Mean error: {np.mean(errors):.3f} px")
+    print(f"  Max error: {np.max(errors):.3f} px")
+
+
+def _print_bounding_box_metrics(corners, width, height):
+    """Print geometric metrics for the detected bounding box."""
+    pts = np.asarray(corners, dtype=np.float32).reshape(4, 2)
+
+    area = abs(cv.contourArea(pts))
+    area_ratio = area / (width * height)
+
+    edges = np.roll(pts, -1, axis=0) - pts
+    edge_lengths = np.linalg.norm(edges, axis=1)
+
+    print("\nBounding-box geometry metrics:")
+    print(f"  Convex: {cv.isContourConvex(pts)}")
+    print(f"  Area: {area:.1f} px²")
+    print(f"  Area ratio: {area_ratio:.3f}")
+    print(f"  Min edge length: {np.min(edge_lengths):.1f} px")
+    print(f"  Max edge length: {np.max(edge_lengths):.1f} px")
+
+
+def _show_calibration_pattern(image, message=None):
+    """Display a calibration pattern and optionally wait for user input."""
+    cv.imshow(WNAME, image)
+    cv.waitKey(1)  # Ensure the image is rendered
+
+    if DEBUG:
+        if message:
+            print(f"{message} Press any key to continue.")
+        cv.waitKey(0)
+    else:
+        time.sleep(1)  # Allow projector and camera to settle
 
 
 if __name__ == "__main__":
-    DEBUG = True
-    CFG = load_config(r"./data/config.json")
+    PROJECT_ROOT = Path(__file__).resolve().parents[3]
+    load_dotenv(PROJECT_ROOT / ".env")
+    CFG_PATH = os.environ.get("CONFIG_PATH")
+    CFG = load_config(CFG_PATH)
+    DEBUG = CFG.get("calibration_debug", False)
 
     # Load intrinsics
     intrinsics_path = Path(CFG["intrinsics_path"])
@@ -357,24 +534,52 @@ if __name__ == "__main__":
         flip_v=CFG["flip"]["vertical"],
     )
 
-    camera_to_projector_H = _calibrate_camera_to_projector(flip_projector_M)
-    bounding_box_H = _calibrate_bounding_box(camera_to_projector_H, flip_projector_M)
-
-    print("Calibration was successful.")
-
-    # Save calibration
+    # Create calibration directory if it doesn't exist
     CALIBRATION_DIR = r"./data/calibration"
     os.makedirs(CALIBRATION_DIR, exist_ok=True)
-    np.save(os.path.join(CALIBRATION_DIR, "cam_to_proj_H.npy"), camera_to_projector_H)
-    np.save(os.path.join(CALIBRATION_DIR, "bounding_box_H.npy"), bounding_box_H)
-    print(f"Calibration was saved to {CALIBRATION_DIR}.")
 
-    if DEBUG:
-        print("Displaying calibration bounding box in white.")
-        debug_img = cv.warpPerspective(
-            WHITE_IMG,
-            bounding_box_H,
-            (CFG["projector"]["width"], CFG["projector"]["height"]),
+    try:
+        camera_to_projector_H = _calibrate_camera_to_projector(flip_projector_M)
+
+        bounding_box_H = None
+
+        if CFG.get("compute_bounding_box_H", False):
+            bounding_box_H = _calibrate_bounding_box(
+                camera_to_projector_H,
+                flip_projector_M,
+            )
+
+        # Save only after all requested calibrations succeed
+        np.save(
+            os.path.join(CALIBRATION_DIR, "cam_to_proj_H.npy"),
+            camera_to_projector_H,
         )
-        cv.imshow(WNAME, debug_img)
-        cv.waitKey(0)
+        print("Camera-to-projector calibration was successful.")
+
+        if bounding_box_H is not None:
+            np.save(
+                os.path.join(CALIBRATION_DIR, "bounding_box_H.npy"),
+                bounding_box_H,
+            )
+            print("Bounding-box calibration was successful.")
+
+        print(f"Calibration saved to {CALIBRATION_DIR}.")
+
+        if DEBUG and bounding_box_H is not None:
+            print("Displaying calibration bounding box. Press any key to exit.")
+
+            debug_img = cv.warpPerspective(
+                WHITE_IMG,
+                bounding_box_H,
+                (CFG["projector"]["width"], CFG["projector"]["height"]),
+            )
+
+            cv.imshow(WNAME, debug_img)
+            cv.waitKey(0)
+
+    except (RuntimeError, ValueError, cv.error) as exc:
+        print(f"Calibration failed: {exc}")
+        raise SystemExit(1)
+
+    finally:
+        cv.destroyAllWindows()

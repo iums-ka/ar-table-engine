@@ -1,0 +1,36 @@
+{
+    "camera": {
+        "width": 2560,
+        "height": 1440,
+        "index": 0,
+        "fps": 30
+    },
+    "undistort": true,
+    "intrinsics_path": "C:/Users/ExploraVision_SG/code/ar-table-engine/data/calibration/yealinkuvc30_1440p.npz",
+    "debug": false,
+    "grace_frames": 3,
+    "min_observations": 3,
+    "projector": {
+        "width": 4096,
+        "height": 2160,
+        "screen_position": [
+            1920,
+            0
+        ]
+    },
+    "main_display": {
+        "width": 1920,
+        "height": 1200
+    },
+    "aruco_detection": {
+        "physical_marker_dict": "DICT_5X5_250",
+        "projected_marker_dict": "DICT_6X6_250"
+        
+    },
+    "flip": {
+        "horizontal": true,
+        "vertical": false
+    },
+    "compute_bounding_box_H": false,
+    "calibration_debug": false
+}
